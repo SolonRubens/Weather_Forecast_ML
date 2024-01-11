@@ -12,9 +12,9 @@ import numpy as np
 cwd = str(Path.cwd())
 
 # Load Data
-arber_data = pd.read_csv(cwd + "/data/Arber.csv")
-schorndorf_data = pd.read_csv(cwd + "/data/Schorndorf.csv")
-straubing_data = pd.read_csv(cwd + "/data/Straubing.csv")
+arber_data = pd.read_csv(cwd + "/../data/Arber.csv")
+schorndorf_data = pd.read_csv(cwd + "/../data/Schorndorf.csv")
+straubing_data = pd.read_csv(cwd + "/../data/Straubing.csv")
 
 # Strippen
 arber_data.columns = arber_data.columns.str.strip()
@@ -74,6 +74,9 @@ from sklearn.preprocessing import MinMaxScaler
 scaler = MinMaxScaler()
 scaled_data = scaler.fit_transform(merged_data.select_dtypes(include=['float64', 'int64']))
 
+# Löschen von nicht vorhandenen Daten (das ist die ursache, dass das modell nan werte ausgibt)
+scaled_data = scaled_data[~np.any(np.isnan(scaled_data), axis=1)]
+
 data_col_index = 0
 niederschlagshoehe_col_index = 2
 
@@ -83,7 +86,6 @@ y = scaled_data[:, 2]
 train_size = int(len(scaled_data)*0.8)
 X_train, X_test = X[:train_size], X[train_size:]
 y_train, y_test = y[:train_size], y[train_size:]
-
 
 # Initialize the Neural Network
 model = Sequential()

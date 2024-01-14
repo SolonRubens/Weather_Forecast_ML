@@ -12,9 +12,9 @@ import numpy as np
 cwd = str(Path.cwd())
 
 # Load Data
-arber_data = pd.read_csv(cwd + "/../data/Arber.csv")
-schorndorf_data = pd.read_csv(cwd + "/../data/Schorndorf.csv")
-straubing_data = pd.read_csv(cwd + "/../data/Straubing.csv")
+arber_data = pd.read_csv(cwd + "/data/Arber.csv")
+schorndorf_data = pd.read_csv(cwd + "/data/Schorndorf.csv")
+straubing_data = pd.read_csv(cwd + "/data/Straubing.csv")
 
 # Strippen
 arber_data.columns = arber_data.columns.str.strip()
@@ -48,9 +48,9 @@ arber_data_filled = pd.concat([arber_non_numeric.reset_index(drop=True), arber_n
 schorndorf_data_filled = pd.concat([schorndorf_non_numeric.reset_index(drop=True), schorndorf_numeric_filled.reset_index(drop=True)], axis=1)
 straubing_data_filled = pd.concat([straubing_non_numeric.reset_index(drop=True), straubing_numeric_filled.reset_index(drop=True)], axis=1)
 
-arber_data_selected = arber_data_filled[["DATE", "LUFTTEMPERATUR", "NIEDERSCHLAGSHOEHE"]]
-schorndorf_data_selected = schorndorf_data_filled[["DATE", "LUFTTEMPERATUR", "NIEDERSCHLAGSHOEHE"]]
-straubing_data_selected = straubing_data_filled[["DATE", "LUFTTEMPERATUR", "NIEDERSCHLAGSHOEHE"]]
+arber_data_selected = arber_data_filled[["DATE", "LUFTTEMPERATUR", "NIEDERSCHLAGSHOEHE", "DAMPFDRUCK", "NIEDERSCHLAGSHOEHE_IND", "SCHNEEHOEHE"]]
+schorndorf_data_selected = schorndorf_data_filled[["DATE", "LUFTTEMPERATUR", "NIEDERSCHLAGSHOEHE", "DAMPFDRUCK", "NIEDERSCHLAGSHOEHE_IND", "SCHNEEHOEHE"]]
+straubing_data_selected = straubing_data_filled[["DATE", "LUFTTEMPERATUR", "NIEDERSCHLAGSHOEHE", "DAMPFDRUCK", "NIEDERSCHLAGSHOEHE_IND", "SCHNEEHOEHE"]]
 
 date_format = "%d.%m.%Y"
 
@@ -67,7 +67,8 @@ schorndorf_data_shifted['DATE'] = pd.to_datetime(schorndorf_data_shifted['DATE']
 straubing_data_selected.loc[:, 'DATE'] = pd.to_datetime(straubing_data['DATE'], format=date_format)
 
 merged_data = straubing_data_selected.merge(arber_data_shifted, on='DATE', how='left', suffixes=('_straubing', '_arber'))
-merged_data = merged_data.merge(schorndorf_data_shifted, on="DATE", how="left", suffixes=("", "_schorndorf"));
+merged_data = merged_data.merge(schorndorf_data_shifted, on="DATE", how="left", suffixes=("", "_schorndorf"));ArithmeticError
+
 
 # 6. Normalization (Example: Using Min-Max Scaling)
 from sklearn.preprocessing import MinMaxScaler
@@ -80,12 +81,17 @@ scaled_data = scaled_data[~np.any(np.isnan(scaled_data), axis=1)]
 data_col_index = 0
 niederschlagshoehe_col_index = 2
 
+
 X = np.delete(scaled_data, [data_col_index, niederschlagshoehe_col_index], axis=1)
 y = scaled_data[:, 2]
 
 train_size = int(len(scaled_data)*0.8)
 X_train, X_test = X[:train_size], X[train_size:]
 y_train, y_test = y[:train_size], y[train_size:]
+
+dates = scaled_data[:, data_col_index]
+print(dates)
+dates_train, dates_test = dates[:train_size], dates[train_size:]
 
 # Initialize the Neural Network
 model = Sequential()
@@ -104,10 +110,15 @@ predictions = model.predict(X_test)
 print("Acutal:", y_test)
 print("Predicted:", predictions.flatten())
 
+# Calculate Mean squared error
+from sklearn.metrics import mean_squared_error
+mse = mean_squared_error(y_test, predictions.flatten())
+print("Mean Squared Error:", mse)
+
 # Visualization
 plt.figure(figsize=(10, 6))
-plt.plot(y_test, y_test, label='Actual')
-plt.plot(y_test, predictions.flatten(), label='Predicted', alpha=0.7)
+plt.plot(dates_test, y_test, label='Actual')
+plt.plot(dates_test, predictions.flatten(), label='Predicted', alpha=0.7)
 plt.title('NIEDERSCHLAGSHOEHE Prediction')
 plt.xlabel('Date')
 plt.ylabel('NIEDERSCHLAGSHOEHE')

@@ -66,31 +66,46 @@ schorndorf_data_shifted['DATE'] = pd.to_datetime(schorndorf_data_shifted['DATE']
 # Convert 'Date' to datetime for merging
 straubing_data_selected.loc[:, 'DATE'] = pd.to_datetime(straubing_data['DATE'], format=date_format)
 
-merged_data = straubing_data_selected.merge(arber_data_shifted, on='DATE', how='left', suffixes=('_straubing', '_arber'))
-merged_data = merged_data.merge(schorndorf_data_shifted, on="DATE", how="left", suffixes=("", "_schorndorf"));ArithmeticError
+# Add Prefix to data
+arber_data_prefixed = arber_data_shifted.add_prefix("arber_")
+schorndorf_data_prefixed = schorndorf_data_shifted.add_prefix("schorndorf_")
+straubing_data_prefixed = straubing_data_selected.add_prefix("straubing_")
+
+merged_data = straubing_data_prefixed.merge(arber_data_prefixed, left_on='straubing_DATE', right_on="arber_DATE", how='left')
+merged_data = merged_data.merge(schorndorf_data_prefixed, how="left", left_on="straubing_DATE", right_on="schorndorf_DATE")
+
+# Löschen von nicht vorhandenen Daten (das ist die ursache, dass das modell nan werte ausgibt)
+merged_data = merged_data[~np.any(np.isnan(merged_data), axis=1)]
+
+# Löschen von 999 Werten (verzerrt die Optimierung des NN)
+merged_data = merged_data[~merged_data.isin([-999]).any(axis=1)]
+
+used_data = merged_data.copy()
+used_data.drop(columns=["schorndorf_DATE", "straubing_DATE", "arber_DATE"], axis=1)
 
 
 # 6. Normalization (Example: Using Min-Max Scaling)
 from sklearn.preprocessing import MinMaxScaler
 scaler = MinMaxScaler()
-scaled_data = scaler.fit_transform(merged_data.select_dtypes(include=['float64', 'int64']))
+# scaled_data = scaler.fit_transform(used_data.select_dtypes(include=['float64', 'int64']))
+scaled_data = used_data.copy()
 
-# Löschen von nicht vorhandenen Daten (das ist die ursache, dass das modell nan werte ausgibt)
-scaled_data = scaled_data[~np.any(np.isnan(scaled_data), axis=1)]
+column_names = used_data.select_dtypes(include=["float64", "int64"]).columns
+
+# Convert scaled_data to DataFrame
+scaled_data = pd.DataFrame(scaled_data, columns=column_names)
 
 data_col_index = 0
-niederschlagshoehe_col_index = 2
 
 
-X = np.delete(scaled_data, [data_col_index, niederschlagshoehe_col_index], axis=1)
-y = scaled_data[:, 2]
+X = scaled_data.drop(columns=["straubing_LUFTTEMPERATUR"], axis=1)
+y = scaled_data["straubing_LUFTTEMPERATUR"]
 
 train_size = int(len(scaled_data)*0.8)
 X_train, X_test = X[:train_size], X[train_size:]
 y_train, y_test = y[:train_size], y[train_size:]
 
-dates = scaled_data[:, data_col_index]
-print(dates)
+dates = merged_data[["straubing_DATE"]]
 dates_train, dates_test = dates[:train_size], dates[train_size:]
 
 # Initialize the Neural Network
@@ -102,13 +117,38 @@ model.add(Dense(1))  # Output layer
 model.compile(optimizer='adam', loss='mean_squared_error')
 
 # Train the model
-model.fit(X_train, y_train, epochs=50, batch_size=32)  # Adjust epochs and batch_size as needed
+model.fit(X_train, y_train, epochs=150, batch_size=32)  # Adjust epochs and batch_size as needed
+
+##########################################
 
 # Predictions
 predictions = model.predict(X_test)
 
-print("Acutal:", y_test)
-print("Predicted:", predictions.flatten())
+# Assuming 'X_test' are your input features and 'y_test' are the actual values
+# 'predictions' are the outputs from your model
+
+# Convert predictions to a DataFrame for easier manipulation
+predictions_df = pd.DataFrame(predictions, columns=['Predicted'])
+
+# Reset index on y_test if it's a pandas Series or DataFrame
+y_test_reset = y_test.reset_index(drop=True)
+
+# Combine actual values, predictions, and inputs (X_test) into one DataFrame
+results_df = pd.concat([X_test.reset_index(drop=True), y_test_reset, predictions_df], axis=1)
+
+# Calculate errors (absolute or squared errors can be used depending on your need)
+results_df['Error'] = abs(results_df['Predicted'] - results_df['straubing_LUFTTEMPERATUR'])
+
+# Define a threshold for outliers, this is subjective and depends on your specific case
+error_threshold = results_df['Error'].quantile(0.95)  # Example: errors in the top 5%
+
+# Filter to find instances where the error exceeds this threshold
+outlier_predictions = results_df[results_df['Error'] > error_threshold]
+
+# Now, outlier_predictions contains the inputs and predictions that are outliers
+# print(outlier_predictions)
+
+###############################################
 
 # Calculate Mean squared error
 from sklearn.metrics import mean_squared_error
@@ -119,8 +159,8 @@ print("Mean Squared Error:", mse)
 plt.figure(figsize=(10, 6))
 plt.plot(dates_test, y_test, label='Actual')
 plt.plot(dates_test, predictions.flatten(), label='Predicted', alpha=0.7)
-plt.title('NIEDERSCHLAGSHOEHE Prediction')
+plt.title('TEMPERATUR Prediction')
 plt.xlabel('Date')
-plt.ylabel('NIEDERSCHLAGSHOEHE')
+plt.ylabel('TEMPERATUR')
 plt.legend()
 plt.show()

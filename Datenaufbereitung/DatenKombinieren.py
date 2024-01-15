@@ -1,3 +1,8 @@
+#
+# Copyright (c) 2024 Jonathan Silber, Monja Biendl, Benedict Sohler
+# 
+# Im zuge einer Projektarbeit für die OTH Regensburg
+#
 import pandas as pd
 import tensorflow as tf
 from keras.models import Sequential

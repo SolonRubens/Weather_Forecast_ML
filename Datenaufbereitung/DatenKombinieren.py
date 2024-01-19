@@ -22,7 +22,7 @@ join_columns = ["DATE"]
 predicting_columns = ["LUFTTEMPERATUR", "NIEDERSCHLAGSHOEHE"]
 linear_interpolation_columns = ["LUFTTEMPERATUR"]
 predict_future_days = 3
-use_past_days = 5
+use_past_days = 0
 date_format = "%d.%m.%Y"
 
 ##################################################################################################################
